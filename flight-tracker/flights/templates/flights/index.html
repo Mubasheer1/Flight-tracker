@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if query %}{{ query }} — {% endif %}SkyTrace — OpenSky Flight Lookup</title>
+    <!-- Leaflet CSS for Interactive Real-Time Map -->
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    />
+    <style>
+        :root {
+            --apple-bg: #f5f5f7;
+            --apple-surface: #ffffff;
+            --apple-surface-subtle: #fbfbfd;
+            --apple-glass: rgba(255, 255, 255, 0.76);
+            --apple-glass-border: rgba(0, 0, 0, 0.08);
+            --apple-text-primary: #1d1d1f;
+            --apple-text-secondary: #6e6e73;
+            --apple-text-tertiary: #86868b;
+            --apple-blue: #0071e3;
+            --apple-blue-hover: #0077ed;
+            --apple-blue-soft: rgba(0, 113, 227, 0.08);
+            --apple-green: #34c759;
+            --apple-green-soft: rgba(52, 199, 89, 0.12);
+            --apple-orange: #ff9500;
+            --apple-border: rgba(0, 0, 0, 0.07);
+            --apple-shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.04);
+            --apple-shadow-md: 0 12px 36px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.03);
+            --apple-shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.09), 0 4px 12px rgba(0, 0, 0, 0.04);
+            --radius-xl: 28px;
+            --radius-lg: 22px;
+            --radius-md: 16px;
+            --radius-pill: 980px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            background-color: var(--apple-bg);
+            color: var(--apple-text-primary);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            min-height: 100vh;
+            line-height: 1.47059;
+            letter-spacing: -0.012em;
+        }
+
+        /* Apple-style Frosted Glass Global Navigation Bar */
+        .global-nav {
+            position: sticky;
+            top: 0;
+            z-index: 2000;
+            height: 52px;
+            background: var(--apple-glass);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid var(--apple-glass-border);
+            transition: background 0.3s ease;
+        }
+
+        .global-nav-content {
+            max-width: 1120px;
+            height: 100%;
+            margin: 0 auto;
+            padding: 0 22px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--apple-text-primary);
+            font-weight: 600;
+            font-size: 1.05rem;
+            letter-spacing: -0.02em;
+        }
+
+        .brand-glyph {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            background: linear-gradient(180deg, #0077ed 0%, #005bb5 100%);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 113, 227, 0.25);
+        }
+
+        .nav-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 5px 12px;
+            border-radius: var(--radius-pill);
+            background: rgba(52, 199, 89, 0.12);
+            color: #1d7d35;
+            font-size: 0.76rem;
+            font-weight: 600;
+            letter-spacing: -0.005em;
+        }
+
+        .pulse-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--apple-green);
+            box-shadow: 0 0 0 rgba(52, 199, 89, 0.6);
+            animation: applePulse 2s infinite;
+        }
+
+        @keyframes applePulse {
+            0% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.6); }
+            70% { box-shadow: 0 0 0 7px rgba(52, 199, 89, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0); }
+        }
+
+        /* Main Page Container */
+        .page-container {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 48px 22px 84px;
+        }
+
+        /* Apple Editorial Hero Header */
+        .hero-header {
+            text-align: center;
+            max-width: 760px;
+            margin: 0 auto 32px;
+        }
+
+        .hero-eyebrow {
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--apple-blue);
+            margin-bottom: 8px;
+        }
+
+        .hero-headline {
+            font-size: clamp(2.2rem, 4.5vw, 3.35rem);
+            font-weight: 700;
+            letter-spacing: -0.038em;
+            line-height: 1.07;
+            color: var(--apple-text-primary);
+            margin-bottom: 12px;
+        }
+
+        .hero-subhead {
+            font-size: clamp(1.02rem, 1.8vw, 1.24rem);
+            font-weight: 400;
+            color: var(--apple-text-secondary);
+            letter-spacing: -0.01em;
+            line-height: 1.4;
+        }
+
+        /* Spotlight-Inspired Search Bar Panel */
+        .search-panel {
+            max-width: 780px;
+            margin: 0 auto 40px;
+            background: var(--apple-surface);
+            border-radius: var(--radius-xl);
+            padding: 24px 28px;
+            box-shadow: var(--apple-shadow-md);
+            border: 1px solid var(--apple-border);
+        }
+
+        .search-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--apple-text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 10px;
+        }
+
+        .search-form-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .search-input-wrap {
+            position: relative;
+            flex: 1;
+            min-width: 240px;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-input-icon {
+            position: absolute;
+            left: 16px;
+            color: var(--apple-text-tertiary);
+            pointer-events: none;
+        }
+
+        .search-input {
+            width: 100%;
+            background: var(--apple-bg);
+            border: 1px solid transparent;
+            border-radius: var(--radius-pill);
+            padding: 14px 20px 14px 44px;
+            font-size: 1.05rem;
+            font-weight: 500;
+            color: var(--apple-text-primary);
+            font-family: inherit;
+            letter-spacing: -0.01em;
+            transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .search-input::placeholder {
+            color: var(--apple-text-tertiary);
+            font-weight: 400;
+        }
+
+        .search-input:focus {
+            outline: none;
+            background: var(--apple-surface);
+            border-color: var(--apple-blue);
+            box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.16);
+        }
+
+        .search-btn {
+            background: var(--apple-blue);
+            color: #ffffff;
+            font-family: inherit;
+            font-size: 0.98rem;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+            padding: 14px 26px;
+            border: none;
+            border-radius: var(--radius-pill);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+            box-shadow: 0 2px 10px rgba(0, 113, 227, 0.24);
+        }
+
+        .search-btn:hover {
+            background: var(--apple-blue-hover);
+            transform: scale(1.015);
+        }
+
+        .search-btn:active {
+            transform: scale(0.99);
+        }
+
+        .quick-samples {
+            margin-top: 16px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            font-size: 0.82rem;
+            color: var(--apple-text-tertiary);
+        }
+
+        .sample-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: var(--radius-pill);
+            background: var(--apple-bg);
+            color: var(--apple-text-primary);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.8rem;
+            transition: all 0.18s ease;
+        }
+
+        .sample-pill:hover {
+            background: var(--apple-blue);
+            color: #ffffff;
+        }
+
+        /* Search Results Section (Directly Under Form Input) */
+        .results-section {
+            margin-bottom: 44px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 18px;
+            padding: 0 4px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.028em;
+            color: var(--apple-text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .count-badge {
+            background: var(--apple-blue-soft);
+            color: var(--apple-blue);
+            font-size: 0.82rem;
+            font-weight: 600;
+            padding: 3px 11px;
+            border-radius: var(--radius-pill);
+            letter-spacing: 0;
+        }
+
+        .section-subtitle {
+            font-size: 0.88rem;
+            color: var(--apple-text-secondary);
+        }
+
+        .flight-results-list {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        /* Apple Bento Flight Card */
+        .flight-card {
+            background: var(--apple-surface);
+            border-radius: var(--radius-xl);
+            padding: 26px 28px;
+            border: 1.5px solid var(--apple-border);
+            box-shadow: var(--apple-shadow-sm);
+            transition: all 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
+            cursor: pointer;
+        }
+
+        .flight-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--apple-shadow-md);
+            border-color: rgba(0, 113, 227, 0.35);
+        }
+
+        .flight-card.active {
+            border-color: var(--apple-blue);
+            box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.14), var(--apple-shadow-md);
+        }
+
+        .flight-card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .flight-ident {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .callsign-tag {
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            color: var(--apple-text-primary);
+        }
+
+        .meta-chip {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--apple-text-secondary);
+            background: var(--apple-bg);
+            padding: 4px 10px;
+            border-radius: 8px;
+        }
+
+        .airline-label {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--apple-text-secondary);
+        }
+
+        .status-pill {
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 5px 13px;
+            border-radius: var(--radius-pill);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-live {
+            background: var(--apple-green-soft);
+            color: #187930;
+        }
+
+        .status-arrived {
+            background: var(--apple-bg);
+            color: var(--apple-text-secondary);
+        }
+
+        /* Apple Boarding-Pass Route Banner inside Card */
+        .route-banner {
+            background: var(--apple-surface-subtle);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            border-radius: var(--radius-lg);
+            padding: 18px 24px;
+            margin-bottom: 18px;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .route-endpoint-code {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.04em;
+            color: var(--apple-text-primary);
+            line-height: 1;
+        }
+
+        .route-endpoint-city {
+            font-size: 0.88rem;
+            font-weight: 500;
+            color: var(--apple-text-secondary);
+            margin-top: 4px;
+        }
+
+        .route-endpoint-right {
+            text-align: right;
+        }
+
+        .route-progress-graphic {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 160px;
+            gap: 6px;
+        }
+
+        .route-progress-track {
+            width: 100%;
+            height: 4px;
+            background: rgba(0, 0, 0, 0.08);
+            border-radius: 99px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .route-progress-fill {
+            height: 100%;
+            background: var(--apple-blue);
+            border-radius: 99px;
+        }
+
+        .route-distance-caption {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--apple-text-tertiary);
+        }
+
+        /* Bento Details Grid for Required Fields */
+        .flight-details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 12px;
+        }
+
+        .detail-box {
+            background: var(--apple-bg);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+        }
+
+        .detail-box-label {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--apple-text-tertiary);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .detail-box-value {
+            font-size: 0.94rem;
+            font-weight: 600;
+            color: var(--apple-text-primary);
+            line-height: 1.38;
+        }
+
+        .detail-box-sub {
+            font-size: 0.78rem;
+            color: var(--apple-text-secondary);
+            margin-top: 3px;
+        }
+
+        .tz-pill {
+            display: inline-block;
+            background: var(--apple-surface);
+            color: var(--apple-blue);
+            border: 1px solid rgba(0, 113, 227, 0.18);
+            padding: 2px 9px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.86rem;
+        }
+
+        /* Apple Maps Showcase Card */
+        .map-showcase {
+            background: var(--apple-surface);
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--apple-border);
+            box-shadow: var(--apple-shadow-lg);
+            overflow: hidden;
+        }
+
+        .map-header-bar {
+            padding: 20px 26px;
+            border-bottom: 1px solid var(--apple-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .map-title-primary {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--apple-text-primary);
+        }
+
+        .map-title-secondary {
+            font-size: 0.84rem;
+            color: var(--apple-text-secondary);
+            margin-top: 2px;
+        }
+
+        .telemetry-strip {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            flex-wrap: wrap;
+            background: var(--apple-bg);
+            padding: 10px 18px;
+            border-radius: var(--radius-md);
+        }
+
+        .telemetry-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .telemetry-label {
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--apple-text-tertiary);
+            font-weight: 600;
+        }
+
+        .telemetry-value {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--apple-text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .map-canvas-wrap {
+            position: relative;
+        }
+
+        #flight-map {
+            width: 100%;
+            height: 540px;
+            background: #e8ecf2;
+        }
+
+        .map-style-toggle {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 1000;
+            background: var(--apple-glass);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border: 1px solid var(--apple-glass-border);
+            border-radius: var(--radius-pill);
+            padding: 4px;
+            display: inline-flex;
+            gap: 4px;
+            box-shadow: var(--apple-shadow-sm);
+        }
+
+        .style-btn {
+            border: none;
+            background: transparent;
+            color: var(--apple-text-secondary);
+            font-family: inherit;
+            font-size: 0.76rem;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: var(--radius-pill);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .style-btn.active {
+            background: var(--apple-surface);
+            color: var(--apple-text-primary);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+        }
+
+        .map-footer {
+            padding: 14px 26px;
+            background: var(--apple-surface-subtle);
+            border-top: 1px solid var(--apple-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 0.8rem;
+            color: var(--apple-text-secondary);
+        }
+
+        .legend-group {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-weight: 500;
+        }
+
+        .legend-line-solid {
+            width: 22px;
+            height: 4px;
+            background: var(--apple-blue);
+            border-radius: 2px;
+        }
+
+        .legend-line-dashed {
+            width: 22px;
+            height: 0;
+            border-top: 2.5px dashed var(--apple-text-tertiary);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 44px 28px;
+            background: var(--apple-surface);
+            border: 1px solid var(--apple-border);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--apple-shadow-sm);
+            color: var(--apple-text-secondary);
+        }
+
+        /* Airplane Marker on Map */
+        .airplane-icon-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            filter: drop-shadow(0 4px 10px rgba(0, 113, 227, 0.45));
+            transition: transform 0.4s linear;
+        }
+
+        @media (max-width: 680px) {
+            .route-banner {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+            .route-endpoint-right {
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Apple-Inspired Sticky Translucent Top Navigation -->
+<nav class="global-nav" aria-label="Global Navigation">
+    <div class="global-nav-content">
+        <a href="{% url 'flights:index' %}" class="brand">
+            <span class="brand-glyph" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                </svg>
+            </span>
+            <span>SkyTrace</span>
+        </a>
+        <div class="nav-status-pill">
+            <span class="pulse-dot"></span>
+            <span id="live-connection-status">OpenSky Network Live</span>
+        </div>
+    </div>
+</nav>
+
+<main class="page-container">
+    <!-- Apple Editorial Hero Section -->
+    <header class="hero-header">
+        <div class="hero-eyebrow">OpenSky Network Intelligence</div>
+        <h1 class="hero-headline">Every flight. Traced in real time.</h1>
+        <p class="hero-subhead">
+            Enter a flight number to view departure and arrival schedules, local time zones, airport coordinates, and live aircraft path tracing.
+        </p>
+    </header>
+
+    <!-- Spotlight-Inspired Flight Search Form -->
+    <section class="search-panel" aria-label="Flight Number Lookup">
+        <form method="get" action="{% url 'flights:index' %}" id="flight-search-form">
+            <label for="flight-number-input" class="search-label">
+                Flight Number or ICAO Callsign
+            </label>
+            <div class="search-form-row">
+                <div class="search-input-wrap">
+                    <svg class="search-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    {{ form.flight_number }}
+                </div>
+                <button type="submit" class="search-btn">
+                    <span>Search Flight</span>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </button>
+            </div>
+        </form>
+
+        <div class="quick-samples">
+            <span>Suggested flights:</span>
+            <a href="?flight_number=BA117" class="sample-pill">BA117</a>
+            <a href="?flight_number=UA901" class="sample-pill">UA901</a>
+            <a href="?flight_number=DLH400" class="sample-pill">DLH400</a>
+            <a href="?flight_number=AA100" class="sample-pill">AA100</a>
+            <a href="?flight_number=AF006" class="sample-pill">AF006</a>
+            <a href="?flight_number=EK201" class="sample-pill">EK201</a>
+            <a href="?flight_number=SQ23" class="sample-pill">SQ23</a>
+        </div>
+    </section>
+
+    {% if error_message %}
+        <div class="empty-state" role="alert" style="margin-bottom: 32px;">
+            {{ error_message }}
+        </div>
+    {% endif %}
+
+    <!-- Search Results Displayed Directly Under the Form Input -->
+    <section id="search-results" class="results-section" aria-live="polite">
+        {% if flights %}
+            <div class="section-header">
+                <h2 class="section-title">
+                    Matching Flights for "{{ query }}"
+                    <span class="count-badge">{{ flights|length }} match{{ flights|length|pluralize:"es" }}</span>
+                </h2>
+                <span class="section-subtitle">
+                    Select any flight card below to focus its real-time trajectory on the map
+                </span>
+            </div>
+
+            <div class="flight-results-list" id="flight-results-container">
+                {% for flight in flights %}
+                    <article
+                        class="flight-card {% if forloop.first %}active{% endif %}"
+                        data-flight-index="{{ forloop.counter0 }}"
+                        onclick="selectFlight({{ forloop.counter0 }})"
+                    >
+                        <div class="flight-card-top">
+                            <div class="flight-ident">
+                                <span class="callsign-tag">{{ flight.callsign }}</span>
+                                {% if flight.iata_flight_number and flight.iata_flight_number != flight.callsign %}
+                                    <span class="meta-chip">IATA {{ flight.iata_flight_number }}</span>
+                                {% endif %}
+                                <span class="meta-chip">ICAO24 {{ flight.icao24|upper }}</span>
+                                <span class="airline-label">{{ flight.airline_name }}</span>
+                            </div>
+                            <span class="status-pill {% if flight.is_live %}status-live{% else %}status-arrived{% endif %}">
+                                {% if flight.is_live %}<span class="pulse-dot"></span>{% endif %}
+                                {{ flight.status }}
+                            </span>
+                        </div>
+
+                        <!-- Apple Boarding-Pass Route Summary -->
+                        <div class="route-banner">
+                            <div>
+                                <div class="route-endpoint-code">{{ flight.origin_airport.iata }}</div>
+                                <div class="route-endpoint-city">{{ flight.origin_airport.city }}, {{ flight.origin_airport.country }}</div>
+                            </div>
+                            <div class="route-progress-graphic">
+                                <div class="route-distance-caption">{{ flight.progress_percent }}% &bull; {{ flight.total_distance_km }} km</div>
+                                <div class="route-progress-track">
+                                    <div class="route-progress-fill" style="width: {{ flight.progress_percent }}%;"></div>
+                                </div>
+                                <div class="route-distance-caption">{{ flight.origin_airport.icao }} &rarr; {{ flight.destination_airport.icao }}</div>
+                            </div>
+                            <div class="route-endpoint-right">
+                                <div class="route-endpoint-code">{{ flight.destination_airport.iata }}</div>
+                                <div class="route-endpoint-city">{{ flight.destination_airport.city }}, {{ flight.destination_airport.country }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Bento Grid: Start Location, End Location, Start Time, End Time, Time Zones -->
+                        <div class="flight-details-grid">
+                            <!-- Start Location -->
+                            <div class="detail-box">
+                                <div class="detail-box-label">Start Location (Origin)</div>
+                                <div class="detail-box-value">{{ flight.start_location }}</div>
+                                <div class="detail-box-sub">
+                                    Coordinates: {{ flight.origin_airport.lat }}, {{ flight.origin_airport.lon }}
+                                </div>
+                            </div>
+
+                            <!-- End Location -->
+                            <div class="detail-box">
+                                <div class="detail-box-label">End Location (Destination)</div>
+                                <div class="detail-box-value">{{ flight.end_location }}</div>
+                                <div class="detail-box-sub">
+                                    Coordinates: {{ flight.destination_airport.lat }}, {{ flight.destination_airport.lon }}
+                                </div>
+                            </div>
+
+                            <!-- Start Time -->
+                            <div class="detail-box">
+                                <div class="detail-box-label">Start Time (Departure)</div>
+                                <div class="detail-box-value">{{ flight.start_time }}</div>
+                                <div class="detail-box-sub">UTC: {{ flight.start_time_utc }}</div>
+                            </div>
+
+                            <!-- End Time -->
+                            <div class="detail-box">
+                                <div class="detail-box-label">End Time (Arrival / Est.)</div>
+                                <div class="detail-box-value">{{ flight.end_time }}</div>
+                                <div class="detail-box-sub">UTC: {{ flight.end_time_utc }}</div>
+                            </div>
+
+                            <!-- Time Zones -->
+                            <div class="detail-box" style="grid-column: 1 / -1;">
+                                <div class="detail-box-label">Time Zones (Origin &amp; Destination)</div>
+                                <div class="detail-box-value" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 2px;">
+                                    <span>Origin: <span class="tz-pill">{{ flight.origin_timezone }}</span></span>
+                                    <span style="color: var(--apple-text-tertiary);">&rarr;</span>
+                                    <span>Destination: <span class="tz-pill">{{ flight.destination_timezone }}</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <p style="font-size: 1.15rem; font-weight: 600; color: var(--apple-text-primary); margin-bottom: 6px;">
+                    Search for any flight number above
+                </p>
+                <p style="font-size: 0.94rem;">
+                    Matching flights from the OpenSky Network API will appear right here with their start time, end time, time zones, start location, and end location.
+                </p>
+            </div>
+        {% endif %}
+    </section>
+
+    <!-- Apple Maps-Style Real-Time Flight Path Showcase -->
+    <section class="map-showcase" aria-label="Real-Time Flight Path Map">
+        <div class="map-header-bar">
+            <div>
+                <div class="map-title-primary" id="map-flight-title">
+                    {% if selected_flight %}
+                        Live Flight Path &mdash; {{ selected_flight.callsign }} ({{ selected_flight.origin_airport.iata }} &rarr; {{ selected_flight.destination_airport.iata }})
+                    {% else %}
+                        Real-Time Flight Path Map
+                    {% endif %}
+                </div>
+                <div class="map-title-secondary" id="map-flight-subtitle">
+                    {% if selected_flight %}
+                        {{ selected_flight.start_location }} to {{ selected_flight.end_location }}
+                    {% else %}
+                        Select or search a flight above to watch the aircraft trace its trajectory in real time
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="telemetry-strip">
+                <div class="telemetry-item">
+                    <span class="telemetry-label">Coordinates</span>
+                    <span class="telemetry-value" id="telemetry-pos">
+                        {% if selected_flight %}{{ selected_flight.latitude }}, {{ selected_flight.longitude }}{% else %}-- , --{% endif %}
+                    </span>
+                </div>
+                <div class="telemetry-item">
+                    <span class="telemetry-label">Altitude</span>
+                    <span class="telemetry-value" id="telemetry-alt">
+                        {% if selected_flight %}{{ selected_flight.altitude_ft }} ft ({{ selected_flight.altitude_m }} m){% else %}--{% endif %}
+                    </span>
+                </div>
+                <div class="telemetry-item">
+                    <span class="telemetry-label">Ground Speed</span>
+                    <span class="telemetry-value" id="telemetry-spd">
+                        {% if selected_flight %}{{ selected_flight.velocity_kmh }} km/h ({{ selected_flight.velocity_kts }} kts){% else %}--{% endif %}
+                    </span>
+                </div>
+                <div class="telemetry-item">
+                    <span class="telemetry-label">Heading</span>
+                    <span class="telemetry-value" id="telemetry-hdg">
+                        {% if selected_flight %}{{ selected_flight.true_track }}&deg;{% else %}--{% endif %}
+                    </span>
+                </div>
+                <div class="telemetry-item">
+                    <span class="telemetry-label">Progress</span>
+                    <span class="telemetry-value" id="telemetry-prog" style="color: var(--apple-blue);">
+                        {% if selected_flight %}{{ selected_flight.progress_percent }}%{% else %}--{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="map-canvas-wrap">
+            <div class="map-style-toggle" role="group" aria-label="Map Appearance">
+                <button type="button" class="style-btn active" id="btn-map-light" onclick="setMapTheme('light')">Apple Light</button>
+                <button type="button" class="style-btn" id="btn-map-dark" onclick="setMapTheme('dark')">Dark Radar</button>
+            </div>
+            <div id="flight-map"></div>
+        </div>
+
+        <div class="map-footer">
+            <div class="legend-group">
+                <span class="legend-item">
+                    <span class="legend-line-solid"></span>
+                    Traced Flight Path (Flown)
+                </span>
+                <span class="legend-item">
+                    <span class="legend-line-dashed"></span>
+                    Projected Route to Destination
+                </span>
+            </div>
+            <div id="last-updated-indicator">
+                {% if selected_flight %}
+                    Real-time path tracing active &bull; OpenSky Network API
+                {% else %}
+                    Ready
+                {% endif %}
+            </div>
+        </div>
+    </section>
+</main>
+
+<!-- Initial Flight Data from Server -->
+<script id="flights-data" type="application/json">{{ flights_json|safe }}</script>
+
+<!-- Leaflet JS -->
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+></script>
+<script>
+(function() {
+    const rawDataEl = document.getElementById('flights-data');
+    let flightsData = [];
+    try {
+        flightsData = JSON.parse(rawDataEl ? rawDataEl.textContent : '[]') || [];
+    } catch (e) {
+        flightsData = [];
+    }
+
+    const map = L.map('flight-map', {
+        center: [35.0, -35.0],
+        zoom: 3,
+        worldCopyJump: true
+    });
+
+    const lightTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a> | OpenSky Network',
+        subdomains: 'abcd',
+        maxZoom: 19
+    });
+
+    const darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a> | OpenSky Network',
+        subdomains: 'abcd',
+        maxZoom: 19
+    });
+
+    lightTiles.addTo(map);
+
+    window.setMapTheme = function(mode) {
+        const btnLight = document.getElementById('btn-map-light');
+        const btnDark = document.getElementById('btn-map-dark');
+        if (mode === 'dark') {
+            map.removeLayer(lightTiles);
+            darkTiles.addTo(map);
+            btnDark.classList.add('active');
+            btnLight.classList.remove('active');
+        } else {
+            map.removeLayer(darkTiles);
+            lightTiles.addTo(map);
+            btnLight.classList.add('active');
+            btnDark.classList.remove('active');
+        }
+    };
+
+    let activeFlightIndex = 0;
+    let originMarker = null;
+    let destMarker = null;
+    let airplaneMarker = null;
+    let tracedPolyline = null;
+    let remainingPolyline = null;
+    let breadcrumbLayerGroup = L.layerGroup().addTo(map);
+
+    function buildAirplaneIcon(headingDeg) {
+        const rotation = Number.isFinite(headingDeg) ? headingDeg : 0;
+        const svgHtml = `
+            <div class="airplane-icon-wrapper" style="transform: rotate(${rotation}deg); width: 38px; height: 38px;">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="#0071e3" stroke="#ffffff" stroke-width="1.4">
+                    <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                </svg>
+            </div>
+        `;
+        return L.divIcon({
+            html: svgHtml,
+            className: '',
+            iconSize: [38, 38],
+            iconAnchor: [19, 19],
+            popupAnchor: [0, -16]
+        });
+    }
+
+    function buildAirportIcon(bgColor, label) {
+        return L.divIcon({
+            html: `
+                <div style="
+                    background: ${bgColor};
+                    color: #ffffff;
+                    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                    font-weight: 700;
+                    font-size: 11px;
+                    padding: 4px 9px;
+                    border-radius: 980px;
+                    border: 2px solid #ffffff;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.22);
+                    white-space: nowrap;
+                ">${label}</div>
+            `,
+            className: '',
+            iconSize: [48, 24],
+            iconAnchor: [24, 12]
+        });
+    }
+
+    function computeBearing(lat1, lon1, lat2, lon2) {
+        const toRad = d => (d * Math.PI) / 180;
+        const toDeg = r => (r * 180) / Math.PI;
+        const phi1 = toRad(lat1);
+        const phi2 = toRad(lat2);
+        const dLam = toRad(lon2 - lon1);
+        const y = Math.sin(dLam) * Math.cos(phi2);
+        const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(dLam);
+        return (toDeg(Math.atan2(y, x)) + 360) % 360;
+    }
+
+    function updateTelemetryBanner(flight) {
+        document.getElementById('map-flight-title').textContent =
+            `Live Flight Path — ${flight.callsign} (${flight.origin_airport.iata} → ${flight.destination_airport.iata})`;
+        document.getElementById('map-flight-subtitle').textContent =
+            `${flight.start_location} to ${flight.end_location}`;
+        document.getElementById('telemetry-pos').textContent =
+            `${flight.latitude.toFixed(4)}, ${flight.longitude.toFixed(4)}`;
+        document.getElementById('telemetry-alt').textContent =
+            `${flight.altitude_ft.toLocaleString()} ft (${flight.altitude_m} m)`;
+        document.getElementById('telemetry-spd').textContent =
+            `${flight.velocity_kmh} km/h (${flight.velocity_kts} kts)`;
+        document.getElementById('telemetry-hdg').textContent =
+            `${flight.true_track.toFixed(1)}°`;
+        document.getElementById('telemetry-prog').textContent =
+            `${flight.progress_percent}%`;
+    }
+
+    function renderFlightOnMap(flight, fitBoundsNow) {
+        if (!flight) return;
+
+        if (originMarker) map.removeLayer(originMarker);
+        if (destMarker) map.removeLayer(destMarker);
+        if (airplaneMarker) map.removeLayer(airplaneMarker);
+        if (tracedPolyline) map.removeLayer(tracedPolyline);
+        if (remainingPolyline) map.removeLayer(remainingPolyline);
+        breadcrumbLayerGroup.clearLayers();
+
+        const orig = flight.origin_airport;
+        const dest = flight.destination_airport;
+
+        originMarker = L.marker([orig.lat, orig.lon], {
+            icon: buildAirportIcon('#1d1d1f', orig.iata || orig.icao)
+        }).addTo(map).bindPopup(`
+            <div style="font-family:-apple-system,sans-serif; color:#1d1d1f; line-height:1.45;">
+                <strong>Start Location: ${orig.name} (${orig.iata} / ${orig.icao})</strong><br/>
+                ${orig.city}, ${orig.country}<br/>
+                Start Time: ${flight.start_time}<br/>
+                Time Zone: ${flight.origin_timezone}
+            </div>
+        `);
+
+        destMarker = L.marker([dest.lat, dest.lon], {
+            icon: buildAirportIcon('#0071e3', dest.iata || dest.icao)
+        }).addTo(map).bindPopup(`
+            <div style="font-family:-apple-system,sans-serif; color:#1d1d1f; line-height:1.45;">
+                <strong>End Location: ${dest.name} (${dest.iata} / ${dest.icao})</strong><br/>
+                ${dest.city}, ${dest.country}<br/>
+                End Time: ${flight.end_time}<br/>
+                Time Zone: ${flight.destination_timezone}
+            </div>
+        `);
+
+        const pathPoints = Array.isArray(flight.path) && flight.path.length > 0
+            ? flight.path
+            : [[orig.lat, orig.lon], [flight.latitude, flight.longitude]];
+
+        tracedPolyline = L.polyline(pathPoints, {
+            color: '#0071e3',
+            weight: 4.5,
+            opacity: 0.95
+        }).addTo(map);
+
+        pathPoints.forEach((pt, idx) => {
+            if (idx > 0 && idx < pathPoints.length - 1 && idx % 3 === 0) {
+                L.circleMarker(pt, {
+                    radius: 3.5,
+                    color: '#ffffff',
+                    fillColor: '#0071e3',
+                    fillOpacity: 1,
+                    weight: 1.5
+                }).addTo(breadcrumbLayerGroup);
+            }
+        });
+
+        const remPoints = Array.isArray(flight.remaining_path) && flight.remaining_path.length > 0
+            ? flight.remaining_path
+            : [[flight.latitude, flight.longitude], [dest.lat, dest.lon]];
+
+        remainingPolyline = L.polyline(remPoints, {
+            color: '#86868b',
+            weight: 2.5,
+            opacity: 0.75,
+            dashArray: '6, 8'
+        }).addTo(map);
+
+        airplaneMarker = L.marker([flight.latitude, flight.longitude], {
+            icon: buildAirplaneIcon(flight.true_track),
+            zIndexOffset: 1000
+        }).addTo(map).bindPopup(`
+            <div style="font-family:-apple-system,sans-serif; color:#1d1d1f; line-height:1.45;">
+                <strong>${flight.callsign} &bull; ${flight.airline_name}</strong><br/>
+                Position: ${flight.latitude.toFixed(4)}, ${flight.longitude.toFixed(4)}<br/>
+                Altitude: ${flight.altitude_ft.toLocaleString()} ft<br/>
+                Ground Speed: ${flight.velocity_kmh} km/h (${flight.velocity_kts} kts)<br/>
+                Heading: ${flight.true_track.toFixed(1)}°
+            </div>
+        `);
+
+        updateTelemetryBanner(flight);
+
+        if (fitBoundsNow) {
+            const allPoints = [...pathPoints, [dest.lat, dest.lon]];
+            const bounds = L.latLngBounds(allPoints);
+            map.fitBounds(bounds, { padding: [60, 60], maxZoom: 7 });
+        }
+    }
+
+    function stepRealtimeInterpolation() {
+        const flight = flightsData[activeFlightIndex];
+        if (!flight || !flight.is_live) return;
+
+        const dest = flight.destination_airport;
+        const speedMs = flight.velocity_ms || 240.0;
+        const stepHours = 1.0 / 3600.0;
+        const distKm = (speedMs * 3.6) * stepHours;
+        const visualMultiplier = 6.0;
+        const angularDistDeg = ((distKm * visualMultiplier) / 111.32);
+
+        const bearing = computeBearing(flight.latitude, flight.longitude, dest.lat, dest.lon);
+        flight.true_track = Number(bearing.toFixed(1));
+
+        const rad = (bearing * Math.PI) / 180.0;
+        const nextLat = flight.latitude + angularDistDeg * Math.cos(rad);
+        const nextLon = flight.longitude + (angularDistDeg * Math.sin(rad)) / Math.max(0.2, Math.cos((flight.latitude * Math.PI) / 180.0));
+
+        flight.latitude = Number(nextLat.toFixed(5));
+        flight.longitude = Number(nextLon.toFixed(5));
+
+        const newCoord = [flight.latitude, flight.longitude];
+        if (!Array.isArray(flight.path)) {
+            flight.path = [[flight.origin_airport.lat, flight.origin_airport.lon]];
+        }
+        flight.path.push(newCoord);
+
+        if (tracedPolyline) {
+            tracedPolyline.setLatLngs(flight.path);
+        }
+        if (remainingPolyline) {
+            remainingPolyline.setLatLngs([newCoord, [dest.lat, dest.lon]]);
+        }
+        if (airplaneMarker) {
+            airplaneMarker.setLatLng(newCoord);
+            airplaneMarker.setIcon(buildAirplaneIcon(flight.true_track));
+        }
+
+        updateTelemetryBanner(flight);
+    }
+
+    async function pollOpenSkyTrack() {
+        const flight = flightsData[activeFlightIndex];
+        if (!flight) return;
+
+        const params = new URLSearchParams({
+            icao24: flight.icao24 || '',
+            callsign: flight.callsign || '',
+            dep_icao: (flight.origin_airport && flight.origin_airport.icao) || '',
+            arr_icao: (flight.destination_airport && flight.destination_airport.icao) || '',
+            first_seen: flight.first_seen || '',
+            last_seen: flight.last_seen || ''
+        });
+
+        try {
+            const resp = await fetch(`/api/flights/track/?${params.toString()}`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (data && data.flight) {
+                const updated = data.flight;
+                if (Array.isArray(flight.path) && Array.isArray(updated.path) && flight.path.length > updated.path.length) {
+                    flight.path.push([updated.latitude, updated.longitude]);
+                    updated.path = flight.path;
+                }
+                flightsData[activeFlightIndex] = updated;
+                renderFlightOnMap(updated, false);
+                const nowStr = new Date().toLocaleTimeString();
+                document.getElementById('last-updated-indicator').textContent =
+                    `Updated ${nowStr} • ${updated.source}`;
+            }
+        } catch (err) {
+            // Keep smooth client interpolation active
+        }
+    }
+
+    window.selectFlight = function(index) {
+        if (index < 0 || index >= flightsData.length) return;
+        activeFlightIndex = index;
+
+        document.querySelectorAll('.flight-card').forEach((card, idx) => {
+            if (idx === index) {
+                card.classList.add('active');
+            } else {
+                card.classList.remove('active');
+            }
+        });
+
+        renderFlightOnMap(flightsData[activeFlightIndex], true);
+    };
+
+    if (flightsData.length > 0) {
+        renderFlightOnMap(flightsData[0], true);
+        setInterval(stepRealtimeInterpolation, 1000);
+        setInterval(pollOpenSkyTrack, 6000);
+    }
+})();
+</script>
+</body>
+</html>
